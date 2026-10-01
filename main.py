@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from pydantic import BaseModel
 from models import Product as _AbstractProduct
 
 
@@ -13,27 +14,55 @@ def _product_method(name):
     return method
 
 
-# Keep the model's existing behaviour while making every abstract operation
-# concrete for use by the API.
-Product = type(
-    "Product",
-    (_AbstractProduct,),
-    {
-        name: _product_method(name)
-        for name in getattr(_AbstractProduct, "__abstractmethods__", ())
-    },
-)
+# Generate the dictionary of fallback methods for the abstract definitions
+abstract_overrides = {
+    name: _product_method(name)
+    for name in getattr(_AbstractProduct, "__abstractmethods__", ())
+}
 
 app = FastAPI()
+
 @app.get("/")
 def greet():
-     return"welcome to the first web page of Sakshi" 
+    return "welcome to the first web page of Sakshi"
 
+
+# This now successfully registers the Pydantic parser fields!
 products = [
-    Product(id=1, name="phone", description="vivo", price=12000.00, quantity=2),
-    Product(id=2, name="iphone", description="iphone 18 max", price=320000, quantity=2)
+    _AbstractProduct(id=1, name="phone", description="vivo", price=12000.00, quantity=2),
+    _AbstractProduct(id=2, name="iphone", description="iphone 18 max", price=320000, quantity=2),
+    _AbstractProduct(id=3, name="charger", description="moto90", price=1200, quantity=20),
+    _AbstractProduct(id=4, name="headphone", description="ipod", price=3200, quantity=29),
 ]
 
 @app.get("/products")
 def get_all_products():
     return products
+
+@app.get("/products/{product_id}")
+def get_product_by_id(product_id: int):
+    for product in products:
+        if product.id == product_id:
+            return product
+    return {"error": "Product not found"} 
+  
+@app.post("/products")
+def create_product(product: Product):
+    products.append(product)
+    return product  
+
+@app.put("/products/{product_id}")
+def update_product(product_id: int, updated_product: _AbstractProduct):
+    for index, product in enumerate(products):
+        if product.id == product_id:
+            products[index] = updated_product
+            return updated_product
+    return {"error": "Product not found"}
+
+@app.delete("/products/{product_id}")
+def delete_product(product_id: int):
+    for index, product in enumerate(products):
+        if product.id == product_id:
+            deleted_product = products.pop(index)
+            return deleted_product
+    return {"error": "Product not found"}
