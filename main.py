@@ -1,6 +1,10 @@
+
+
 from fastapi import FastAPI
 from pydantic import BaseModel
 from models import Product as _AbstractProduct
+from database import session , engine 
+import database_models   
 
 
 def _product_method(name):
@@ -22,6 +26,9 @@ abstract_overrides = {
 
 app = FastAPI()
 
+data_model.metadata.create_all(bind=database_models.engine)  # Create tables in the database
+
+
 @app.get("/")
 def greet():
     return "welcome to the first web page of Sakshi"
@@ -34,10 +41,15 @@ products = [
     _AbstractProduct(id=3, name="charger", description="moto90", price=1200, quantity=20),
     _AbstractProduct(id=4, name="headphone", description="ipod", price=3200, quantity=29),
 ]
-
+def __init__db():
+    for product in products:
+        db.add(database_models.Product(**product.model_dump()))  # Use model_dump() to convert Pydantic model to dictionary
+    db.commit()
 @app.get("/products")
 def get_all_products():
+    db = session()
     return products
+
 
 @app.get("/products/{product_id}")
 def get_product_by_id(product_id: int):
